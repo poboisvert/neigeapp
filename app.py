@@ -6,6 +6,7 @@ import json
 import zeep
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 # Load environment variables from .env file
@@ -14,6 +15,15 @@ load_dotenv()
 DEFAULT_URL = ('https://servicesenligne2.ville.montreal.qc.ca/api/infoneige/InfoneigeWebService?WSDL')
 
 app = FastAPI(title="Info Neige MTL API", version="1.0.0")
+
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 def get_etat_deneig_status(etat: int) -> str:
