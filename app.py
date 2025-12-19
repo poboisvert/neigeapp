@@ -1,7 +1,8 @@
 """FastAPI application for Montreal snow planning data"""
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, Dict, Any
 import os
+import json
 import zeep
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
@@ -39,6 +40,7 @@ class PlanificationResponse(BaseModel):
     dateDebutReplanif: Optional[str]
     dateFinReplanif: Optional[str]
     dateMaj: Optional[str]
+    streetFeature: Optional[Dict[str, Any]] = None  # Full feature object from gbdouble.json
 
 
 def validate_date_format(date_str: str) -> bool:
@@ -120,6 +122,9 @@ class PlanifNeigeClient:
 # Global client instance (will be initialized with token)
 client: Optional[PlanifNeigeClient] = None
 
+# Global mapping from COTE_RUE_ID to full feature object
+gbdouble_mapping: Dict[int, Dict[str, Any]] = {}
+
 
 @app.on_event("startup")
 async def startup_event():
@@ -132,6 +137,27 @@ async def startup_event():
         print(f"Client initialized with token (first 20 chars): {token[:20]}...")
     global client
     client = PlanifNeigeClient(token)
+    
+    # Load gbdouble.json and create mapping from COTE_RUE_ID to full feature object
+    global gbdouble_mapping
+    try:
+        print("Loading gbdouble.json...")
+        with open("gbdouble.json", "r", encoding="utf-8") as f:
+            geojson_data = json.load(f)
+        
+        features = geojson_data.get("features", [])
+        for feature in features:
+            properties = feature.get("properties", {})
+            cote_rue_id = properties.get("COTE_RUE_ID")
+            if cote_rue_id is not None:
+                # Store the entire feature object (type, geometry, properties)
+                gbdouble_mapping[cote_rue_id] = feature
+        
+        print(f"Loaded {len(gbdouble_mapping)} features from gbdouble.json")
+    except FileNotFoundError:
+        print("WARNING: gbdouble.json not found. Street features will not be included.")
+    except Exception as e:
+        print(f"WARNING: Error loading gbdouble.json: {str(e)}. Street features will not be included.")
 
 
 @app.get("/")
@@ -181,6 +207,17 @@ async def get_planifications(from_date: Optional[str] = None):
     
     try:
         planifications = client.get_planification_for_date(from_date)
+
+        # Enrich planifications with status and street feature from gbdouble.json
+        for planif in planifications:
+            # Add human-readable status (always required)
+            etat_deneig = planif.get('etatDeneig')
+            planif['status'] = get_etat_deneig_status(etat_deneig) if etat_deneig is not None else "État inconnu"
+            
+            # Add full feature object from gbdouble.json if match found
+            cote_rue_id = planif.get('coteRueId')
+            if cote_rue_id and cote_rue_id in gbdouble_mapping:
+                planif['streetFeature'] = gbdouble_mapping[cote_rue_id]
 
         # Prepare log content
         log_lines = []
@@ -247,6 +284,14 @@ async def get_planification_for_street(street_side_id: int):
                 status_code=404,
                 detail=f"No planification found for street side ID: {street_side_id}"
             )
+        
+        # Enrich planification with status and street feature from gbdouble.json
+        etat_deneig = planif.get('etatDeneig')
+        planif['status'] = get_etat_deneig_status(etat_deneig) if etat_deneig is not None else "État inconnu"
+        
+        cote_rue_id = planif.get('coteRueId')
+        if cote_rue_id and cote_rue_id in gbdouble_mapping:
+            planif['streetFeature'] = gbdouble_mapping[cote_rue_id]
         
         # Print result as requested
         print("\n" + "="*80)
