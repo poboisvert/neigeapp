@@ -1236,14 +1236,6 @@ export default function MapApp() {
             </form>
           </div>
 
-          <pre className='text-xs py-2 px-3 bg-gray-800 text-gray-100 rounded mb-2'>
-            <br></br>
-            <br></br>
-            <br></br>
-            <br></br>
-            <br></br>
-            {JSON.stringify(initialCenter, null, 2)}
-          </pre>
           {initialCenter ? (
             <SnowMap
               planifications={planifications}
