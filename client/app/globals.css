@@ -193,22 +193,17 @@
   height: 36px;
   background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
   border-radius: 50% 50% 50% 0;
-  transform: rotate(-45deg);
+  /* Always apply what used to be the hover effect: */
+  transform: rotate(-45deg) scale(1.2);
   border: 3px solid white;
   display: flex;
   align-items: center;
   justify-content: center;
-  animation: marker-pulse 2s ease-in-out infinite,
-    marker-glow 2s ease-in-out infinite;
-  transition: all 0.3s ease;
-  z-index: 1000;
-}
-
-.custom-search-marker-pin:hover {
-  animation: none;
-  transform: rotate(-45deg) scale(1.2);
+  /* Remove animation, as in hover state */
   box-shadow: 0 8px 20px rgba(59, 130, 246, 0.8),
     0 0 0 4px rgba(59, 130, 246, 0.3);
+  transition: all 0.3s ease;
+  z-index: 1000;
 }
 
 .custom-search-marker-dot {

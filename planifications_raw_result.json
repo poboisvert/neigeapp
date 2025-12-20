@@ -1,0 +1,19 @@
+{
+  "responseStatus": 0,
+  "responseDesc": "OK",
+  "planifications": {
+    "reuqestCreationDate": null,
+    "reuqestFromDate": null,
+    "reuqestToDate": null,
+    "duration": null,
+    "count": 55221,
+    "planification": [
+      {
+        "munid": 66023,
+        "coteRueId": 16047342,
+        "etatDeneig": 10,
+        "dateDebutPlanif": null,
+        "dateFinPlanif": null,
+        "dateDebutReplanif": null,
+        "dateFinReplanif": null,
+        "dateMaj": 
