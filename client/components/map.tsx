@@ -10,6 +10,7 @@ import {
   Popup,
   useMap,
   useMapEvents,
+  ZoomControl,
 } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -601,7 +602,9 @@ export default function SnowMap({
       zoom={16}
       style={{ height: "100%", width: "100%" }}
       className='z-0'
+      zoomControl={false}
     >
+      <ZoomControl position='bottomleft' />
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
         url={

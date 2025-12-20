@@ -64,12 +64,11 @@ export default function MapApp() {
     lat: number;
     lng: number;
     zoom?: number;
-  }>({ lat: 45.5019, lng: -73.5674, zoom: 16 });
+  }>({ lat: 45.5019, lng: -73.5674, zoom: 18 });
   const [searchSuggestions, setSearchSuggestions] = useState<GeocodingResult[]>(
     []
   );
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [isSearching, setIsSearching] = useState(false);
   const [zoomTrigger, setZoomTrigger] = useState(0);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [user, setUser] = useState<SupabaseUser | null>(null);
@@ -542,13 +541,10 @@ export default function MapApp() {
       return;
     }
 
-    setIsSearching(true);
-
     searchTimeoutRef.current = setTimeout(async () => {
       const results = await searchAddress(value);
       setSearchSuggestions(results);
       setShowSuggestions(results.length > 0);
-      setIsSearching(false);
     }, 500);
   };
 
@@ -567,7 +563,6 @@ export default function MapApp() {
     e.preventDefault();
     if (searchQuery.trim().length < 3) return;
 
-    setIsSearching(true);
     const results = await searchAddress(searchQuery);
 
     if (results.length > 0) {
@@ -582,7 +577,6 @@ export default function MapApp() {
 
     setShowSuggestions(false);
     setSearchSuggestions([]);
-    setIsSearching(false);
   };
 
   useEffect(() => {
