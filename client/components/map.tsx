@@ -103,17 +103,18 @@ function ZoomToSelected({
     if (!selected?.streetFeature?.geometry?.coordinates) return;
 
     const coords = selected.streetFeature.geometry.coordinates;
-    const bounds = L.latLngBounds([]);
 
-    coords.forEach((coord: [number, number]) => {
-      bounds.extend([coord[1], coord[0]]);
-    });
+    // Calculate midpoint of the line
+    const midpoint = calculateMidpointOnLine(coords);
+    if (!midpoint) return;
 
-    if (!bounds.isValid()) return;
+    // Get current zoom level to preserve it
+    const currentZoom = map.getZoom();
 
-    map.fitBounds(bounds, {
-      padding: [100, 100],
-      maxZoom: 16,
+    // Center on the feature but keep the current zoom level
+    map.setView(midpoint, currentZoom, {
+      animate: true,
+      duration: 0.5,
     });
   }, [map, selected, trigger]);
 

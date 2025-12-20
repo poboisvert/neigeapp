@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SegmentControl } from "@/components/ui/segment-control";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   MapPin,
   Snowflake,
@@ -142,23 +143,9 @@ export default function MapApp() {
               streetFeature: street.street_feature,
             }));
 
-          // If bounds are provided, merge with existing planifications to avoid duplicates
-          if (bounds) {
-            setPlanifications((prev) => {
-              // Create a map of existing planifications by coteRueId
-              const existingMap = new Map(prev.map((p) => [p.coteRueId, p]));
-
-              // Add or update with new data
-              transformedData.forEach((newPlanif: any) => {
-                existingMap.set(newPlanif.coteRueId, newPlanif);
-              });
-
-              return Array.from(existingMap.values());
-            });
-          } else {
-            // No bounds - replace all data (initial load)
-            setPlanifications(transformedData);
-          }
+          // If bounds are provided, replace with only the data from the API (viewport data)
+          // Otherwise, replace all data (initial load)
+          setPlanifications(transformedData);
         }
       } catch (error) {
         console.error("Error loading snow planning:", error);
@@ -190,9 +177,13 @@ export default function MapApp() {
     try {
       const { data, error } = await supabase
         .from("user_favorites")
-        .select("cote_rue_id");
+        .select("cote_rue_id")
+        .eq("user_id", user.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error loading favorites:", error);
+        throw error;
+      }
 
       const favoriteIds = new Set(data?.map((f) => f.cote_rue_id) || []);
       setFavorites(favoriteIds);
@@ -200,6 +191,62 @@ export default function MapApp() {
       console.error("Error loading favorites:", error);
     }
   };
+
+  // Load favorite planifications with full street data
+  const loadFavoritePlanifications = useCallback(async () => {
+    if (!user || favorites.size === 0) {
+      return [];
+    }
+
+    try {
+      const favoriteIds = Array.from(favorites);
+
+      const { data, error } = await supabase
+        .from("streets")
+        .select(
+          `*,
+          deneigement_current (
+            etat_deneig,
+            status,
+            date_debut_planif,
+            date_fin_planif,
+            date_debut_replanif,
+            date_fin_replanif,
+            date_maj
+          )`
+        )
+        .in("cote_rue_id", favoriteIds);
+
+      if (error) {
+        console.error("Error loading favorite planifications:", error);
+        throw error;
+      }
+
+      if (!data) return [];
+
+      return data
+        .filter(
+          (street: any) =>
+            street.deneigement_current && street.street_feature?.geometry
+        )
+        .map((street: any) => ({
+          munid: 66023,
+          coteRueId: street.cote_rue_id,
+          etatDeneig: street.deneigement_current.etat_deneig,
+          status: street.deneigement_current.status,
+          dateDebutPlanif: street.deneigement_current.date_debut_planif,
+          dateFinPlanif: street.deneigement_current.date_fin_planif,
+          dateDebutReplanif: street.deneigement_current.date_debut_replanif,
+          dateFinReplanif: street.deneigement_current.date_fin_replanif,
+          dateMaj: street.deneigement_current.date_maj,
+          streetFeature: street.street_feature,
+          isFavorite: true, // Mark as favorite
+        }));
+    } catch (error) {
+      console.error("Error loading favorite planifications:", error);
+      return [];
+    }
+  }, [user, favorites]);
 
   const toggleFavorite = async (coteRueId: number) => {
     if (!user) {
@@ -209,13 +256,17 @@ export default function MapApp() {
 
     try {
       if (favorites.has(coteRueId)) {
+        // Remove from favorites
         const { error } = await supabase
           .from("user_favorites")
           .delete()
           .eq("cote_rue_id", coteRueId)
           .eq("user_id", user.id);
 
-        if (error) throw error;
+        if (error) {
+          console.error("Error removing favorite:", error);
+          throw error;
+        }
 
         setFavorites((prev) => {
           const newSet = new Set(prev);
@@ -223,17 +274,28 @@ export default function MapApp() {
           return newSet;
         });
       } else {
+        // Add to favorites
         const { error } = await supabase.from("user_favorites").insert({
           cote_rue_id: coteRueId,
           user_id: user.id,
         });
 
-        if (error) throw error;
+        if (error) {
+          console.error("Error adding favorite:", error);
+          // Check if it's a duplicate key error (already favorited)
+          if (error.code === "23505") {
+            // Already exists, just update local state
+            setFavorites((prev) => new Set(prev).add(coteRueId));
+            return;
+          }
+          throw error;
+        }
 
         setFavorites((prev) => new Set(prev).add(coteRueId));
       }
     } catch (error) {
       console.error("Error toggling favorite:", error);
+      // Optionally show a toast notification to the user
     }
   };
 
@@ -333,10 +395,46 @@ export default function MapApp() {
     };
   }, [user]);
 
-  const filteredPlanifications =
-    filterMode === "favorites"
-      ? planifications.filter((p) => favorites.has(p.coteRueId))
-      : planifications;
+  // State to hold favorite planifications
+  const [favoritePlanifications, setFavoritePlanifications] = useState<any[]>(
+    []
+  );
+
+  // Load favorite planifications when favorites change
+  useEffect(() => {
+    if (user && favorites.size > 0) {
+      loadFavoritePlanifications().then((favPlanifs) => {
+        setFavoritePlanifications(favPlanifs);
+      });
+    } else {
+      setFavoritePlanifications([]);
+    }
+  }, [user, favorites, loadFavoritePlanifications]);
+
+  // Merge viewport planifications with favorites, avoiding duplicates
+  const mergedPlanifications = useMemo(() => {
+    const viewportIds = new Set(planifications.map((p: any) => p.coteRueId));
+
+    // Combine viewport data with favorites that aren't already in viewport
+    const combined = [...planifications];
+
+    favoritePlanifications.forEach((favPlanif: any) => {
+      if (!viewportIds.has(favPlanif.coteRueId)) {
+        combined.push(favPlanif);
+      }
+    });
+
+    return combined;
+  }, [planifications, favoritePlanifications]);
+
+  const filteredPlanifications = useMemo(() => {
+    if (filterMode === "favorites") {
+      return mergedPlanifications.filter((p: any) =>
+        favorites.has(p.coteRueId)
+      );
+    }
+    return mergedPlanifications;
+  }, [mergedPlanifications, filterMode, favorites]);
 
   const handleSearchInputChange = async (value: string) => {
     setSearchQuery(value);
@@ -645,7 +743,9 @@ export default function MapApp() {
                 darkMode ? "text-gray-400" : "text-gray-600"
               } mb-3`}
             >
-              {filteredPlanifications.length} of {planifications.length} streets
+              {filteredPlanifications.length}{" "}
+              {filteredPlanifications.length === 1 ? "street" : "streets"}
+              {filterMode === "favorites" && " (favorites)"}
             </p>
             <div className='mb-3 flex justify-center'>
               <SegmentControl
@@ -681,7 +781,7 @@ export default function MapApp() {
 
           <div className='flex-1 overflow-y-auto p-4'>
             <div className='space-y-2'>
-              {filteredPlanifications.map((planif, index) => (
+              {filteredPlanifications.map((planif: any, index: number) => (
                 <div
                   key={index}
                   className={`p-3 rounded-lg border transition-all relative ${
@@ -918,20 +1018,46 @@ export default function MapApp() {
               </div>
             </form>
           </div>
-          <SnowMap
-            planifications={planifications}
-            selectedPlanification={selectedPlanif}
-            darkMode={darkMode}
-            searchLocation={searchLocation}
-            initialCenter={initialCenter}
-            zoomTrigger={zoomTrigger}
-            onPlanificationClick={(planif) => {
-              setSelectedPlanif(planif);
-              setZoomTrigger((prev) => prev + 1);
-            }}
-            onBoundsChange={handleBoundsChange}
-            enableDynamicFetching={true}
-          />
+          {initialCenter ? (
+            <SnowMap
+              planifications={planifications}
+              selectedPlanification={selectedPlanif}
+              darkMode={darkMode}
+              searchLocation={searchLocation}
+              initialCenter={initialCenter}
+              zoomTrigger={zoomTrigger}
+              onPlanificationClick={(planif) => {
+                setSelectedPlanif(planif);
+                setZoomTrigger((prev) => prev + 1);
+              }}
+              onBoundsChange={handleBoundsChange}
+              enableDynamicFetching={true}
+            />
+          ) : (
+            <div className='relative w-full h-full'>
+              <Skeleton
+                className={`w-full h-full ${
+                  darkMode ? "bg-gray-800" : "bg-gray-100"
+                }`}
+              />
+              <div className='absolute inset-0 flex flex-col items-center justify-center gap-4'>
+                <div className='flex flex-col items-center gap-2'>
+                  <MapPin
+                    className={`h-8 w-8 ${
+                      darkMode ? "text-gray-600" : "text-gray-400"
+                    } animate-pulse`}
+                  />
+                  <p
+                    className={`text-sm ${
+                      darkMode ? "text-gray-400" : "text-gray-600"
+                    }`}
+                  >
+                    Loading map...
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {selectedPlanif && (
             <div
