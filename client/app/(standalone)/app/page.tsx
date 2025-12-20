@@ -20,7 +20,6 @@ import {
   MapPin,
   Snowflake,
   RefreshCw,
-  ArrowLeft,
   Search,
   Star,
   User,
@@ -1184,90 +1183,85 @@ export default function MapApp() {
               </div>
             </div>
           )}
-          <div className='absolute top-4 left-1/2 -translate-x-1/2 z-10 w-full max-w-md px-4'>
+          <div className='absolute top-4 left-4 right-20 md:left-1/2 md:-translate-x-1/2 md:right-auto z-10 md:w-full md:max-w-md'>
             <form onSubmit={handleSearch} className='relative search-container'>
-              <div className='flex gap-2'>
-                <div className='flex-1 relative'>
-                  <Input
-                    type='text'
-                    placeholder='Search address in Montreal...'
-                    value={searchQuery}
-                    onChange={(e) => handleSearchInputChange(e.target.value)}
-                    onFocus={() =>
-                      searchSuggestions.length > 0 && setShowSuggestions(true)
-                    }
-                    className={`shadow-lg ${
+              <div className='relative'>
+                <Input
+                  type='text'
+                  placeholder='Search address in Montreal...'
+                  value={searchQuery}
+                  onChange={(e) => handleSearchInputChange(e.target.value)}
+                  onFocus={() =>
+                    searchSuggestions.length > 0 && setShowSuggestions(true)
+                  }
+                  className={`shadow-lg pr-10 w-full ${
+                    darkMode
+                      ? "bg-gray-800 border-gray-600 text-gray-100 placeholder:text-gray-400"
+                      : "bg-white border-gray-300 text-gray-900 placeholder:text-gray-500"
+                  }`}
+                />
+                <Search
+                  className={`absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 ${
+                    darkMode ? "text-gray-400" : "text-gray-500"
+                  }`}
+                />
+                {showSuggestions && searchSuggestions.length > 0 && (
+                  <div
+                    className={`absolute top-full mt-2 w-full rounded-lg shadow-xl border ${
                       darkMode
-                        ? "bg-gray-800 border-gray-600 text-gray-100 placeholder:text-gray-400"
-                        : "bg-white border-gray-300 text-gray-900 placeholder:text-gray-500"
-                    }`}
-                  />
-                  {showSuggestions && searchSuggestions.length > 0 && (
-                    <div
-                      className={`absolute top-full mt-2 w-full rounded-lg shadow-xl border ${
-                        darkMode
-                          ? "bg-gray-800 border-gray-700"
-                          : "bg-white border-gray-200"
-                      } max-h-80 overflow-y-auto z-50`}
-                    >
-                      {searchSuggestions.map((suggestion, index) => (
-                        <button
-                          key={index}
-                          type='button'
-                          onClick={() => handleSelectSuggestion(suggestion)}
-                          className={`w-full text-left px-4 py-3 hover:bg-opacity-80 transition-colors border-b last:border-b-0 ${
-                            darkMode
-                              ? "hover:bg-gray-700 border-gray-700 text-gray-100"
-                              : "hover:bg-gray-50 border-gray-100 text-gray-900"
-                          }`}
-                        >
-                          <div className='flex items-start gap-2'>
-                            <MapPin
-                              className={`h-4 w-4 mt-0.5 shrink-0 ${
-                                darkMode ? "text-blue-400" : "text-blue-600"
+                        ? "bg-gray-800 border-gray-700"
+                        : "bg-white border-gray-200"
+                    } max-h-80 overflow-y-auto z-50`}
+                  >
+                    {searchSuggestions.map((suggestion, index) => (
+                      <button
+                        key={index}
+                        type='button'
+                        onClick={() => handleSelectSuggestion(suggestion)}
+                        className={`w-full text-left px-4 py-3 hover:bg-opacity-80 transition-colors border-b last:border-b-0 ${
+                          darkMode
+                            ? "hover:bg-gray-700 border-gray-700 text-gray-100"
+                            : "hover:bg-gray-50 border-gray-100 text-gray-900"
+                        }`}
+                      >
+                        <div className='flex items-start gap-2'>
+                          <MapPin
+                            className={`h-4 w-4 mt-0.5 shrink-0 ${
+                              darkMode ? "text-blue-400" : "text-blue-600"
+                            }`}
+                          />
+                          <div className='flex-1 min-w-0'>
+                            <p
+                              className={`text-sm font-medium truncate ${
+                                darkMode ? "text-gray-100" : "text-gray-900"
                               }`}
-                            />
-                            <div className='flex-1 min-w-0'>
-                              <p
-                                className={`text-sm font-medium truncate ${
-                                  darkMode ? "text-gray-100" : "text-gray-900"
-                                }`}
-                              >
-                                {suggestion.address.road
-                                  ? `${suggestion.address.house_number || ""} ${
-                                      suggestion.address.road
-                                    }`.trim()
-                                  : suggestion.display_name.split(",")[0]}
-                              </p>
-                              <p
-                                className={`text-xs truncate ${
-                                  darkMode ? "text-gray-400" : "text-gray-500"
-                                }`}
-                              >
-                                {[
-                                  suggestion.address.suburb,
-                                  suggestion.address.city ||
-                                    suggestion.address.municipality,
-                                  suggestion.address.postcode,
-                                ]
-                                  .filter(Boolean)
-                                  .join(", ")}
-                              </p>
-                            </div>
+                            >
+                              {suggestion.address.road
+                                ? `${suggestion.address.house_number || ""} ${
+                                    suggestion.address.road
+                                  }`.trim()
+                                : suggestion.display_name.split(",")[0]}
+                            </p>
+                            <p
+                              className={`text-xs truncate ${
+                                darkMode ? "text-gray-400" : "text-gray-500"
+                              }`}
+                            >
+                              {[
+                                suggestion.address.suburb,
+                                suggestion.address.city ||
+                                  suggestion.address.municipality,
+                                suggestion.address.postcode,
+                              ]
+                                .filter(Boolean)
+                                .join(", ")}
+                            </p>
                           </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <Button
-                  type='submit'
-                  disabled={isSearching || searchQuery.trim().length < 3}
-                  className='shadow-lg bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50'
-                >
-                  <Search className='h-4 w-4 mr-2' />
-                  Search
-                </Button>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </form>
           </div>

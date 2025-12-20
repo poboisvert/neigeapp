@@ -1,8 +1,7 @@
-import "./globals.css";
+import "../globals.css";
 import type { Metadata } from "next";
 import { Inter, Patrick_Hand } from "next/font/google";
 
-import { Footer } from "@/components/footer";
 import { detectLanguage } from "@/app/i18n/server";
 import { I18nProvider } from "@/app/i18n/i18n-context";
 
@@ -40,13 +39,26 @@ export default async function RootLayout({
 }) {
   const lng = await detectLanguage();
 
+  // Detect dark mode (light by default)
+  let isDarkMode = false;
+  if (typeof window !== "undefined" && window.matchMedia) {
+    isDarkMode = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  }
+  // Fallback to light if SSR
+  const themeColor = isDarkMode ? "#111827" : "#ffffff";
+
   return (
     <html lang={lng}>
+      <head>
+        <meta
+          name='viewport'
+          content='width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no'
+        />
+        {/* theme-color meta for light/dark browser UI */}
+        <meta name='theme-color' content={themeColor} />
+      </head>
       <body className={`${inter.className} ${patrickHand.variable}`}>
-        <I18nProvider language={lng}>
-          {children}
-          <Footer />
-        </I18nProvider>
+        <I18nProvider language={lng}>{children}</I18nProvider>
       </body>
     </html>
   );
