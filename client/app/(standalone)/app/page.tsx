@@ -374,7 +374,7 @@ export default function MapApp() {
           setInitialCenter({
             lat: parseFloat(lat),
             lng: parseFloat(lng),
-            zoom: 15,
+            zoom: 16,
           });
         }
       } catch (error) {
@@ -1265,6 +1265,15 @@ export default function MapApp() {
               </div>
             </form>
           </div>
+
+          <pre className='text-xs py-2 px-3 bg-gray-800 text-gray-100 rounded mb-2'>
+            <br></br>
+            <br></br>
+            <br></br>
+            <br></br>
+            <br></br>
+            {JSON.stringify(initialCenter, null, 2)}
+          </pre>
           {initialCenter ? (
             <SnowMap
               planifications={planifications}
