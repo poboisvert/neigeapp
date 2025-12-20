@@ -39,14 +39,6 @@ export default async function RootLayout({
 }) {
   const lng = await detectLanguage();
 
-  // Detect dark mode (light by default)
-  let isDarkMode = false;
-  if (typeof window !== "undefined" && window.matchMedia) {
-    isDarkMode = window.matchMedia("(prefers-color-scheme: dark)").matches;
-  }
-  // Fallback to light if SSR
-  const themeColor = isDarkMode ? "#111827" : "#ffffff";
-
   return (
     <html lang={lng}>
       <head>
@@ -60,7 +52,7 @@ export default async function RootLayout({
         />
 
         {/* theme-color meta for light/dark browser UI */}
-        <meta name='theme-color' content={themeColor} />
+        <meta name='theme-color' content={"#111827"} />
       </head>
       <body className={`${inter.className} ${patrickHand.variable}`}>
         <I18nProvider language={lng}>{children}</I18nProvider>
