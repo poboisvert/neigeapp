@@ -41,6 +41,45 @@ const createCustomIcon = () => {
   });
 };
 
+const createParkingIcon = () => {
+  return L.divIcon({
+    className: "parking-marker",
+    html: `
+      <div style="
+        background-color: #3b82f6;
+        width: 32px;
+        height: 32px;
+        border-radius: 50% 50% 50% 0;
+        transform: rotate(-45deg);
+        border: 3px solid white;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      ">
+        <span style="
+          transform: rotate(45deg);
+          color: white;
+          font-weight: bold;
+          font-size: 18px;
+        ">P</span>
+      </div>
+    `,
+    iconSize: [32, 32],
+    iconAnchor: [16, 32],
+    popupAnchor: [0, -32],
+  });
+};
+
+interface ParkingLocation {
+  id: string;
+  latitude: number;
+  longitude: number;
+  name?: string | null;
+  notes?: string | null;
+  created_at: string;
+}
+
 interface SnowMapProps {
   planifications: PlanificationResponse[];
   selectedPlanification?: PlanificationResponse | null;
@@ -56,6 +95,10 @@ interface SnowMapProps {
     maxLng: number;
   }) => void;
   enableDynamicFetching?: boolean;
+  onMapClick?: (lat: number, lng: number) => void;
+  parkingLocations?: ParkingLocation[];
+  onParkingLocationDelete?: (id: string) => void;
+  selectedParkingLocationId?: string | null;
 }
 
 function FitBounds({
@@ -223,6 +266,96 @@ function MapBoundsTracker({
   return null;
 }
 
+function MapClickHandler({
+  onMapClick,
+}: {
+  onMapClick?: (lat: number, lng: number) => void;
+}) {
+  const map = useMap();
+
+  useMapEvents({
+    click: (e) => {
+      if (onMapClick) {
+        onMapClick(e.latlng.lat, e.latlng.lng);
+      }
+    },
+  });
+
+  return null;
+}
+
+function ParkingMarker({
+  parking,
+  isSelected,
+  onDelete,
+}: {
+  parking: ParkingLocation;
+  isSelected: boolean;
+  onDelete?: (id: string) => void;
+}) {
+  const markerRef = useRef<L.Marker | null>(null);
+
+  useEffect(() => {
+    if (isSelected && markerRef.current) {
+      // Small delay to ensure map has updated position
+      setTimeout(() => {
+        markerRef.current?.openPopup();
+      }, 300);
+    }
+  }, [isSelected]);
+
+  return (
+    <Marker
+      ref={markerRef}
+      position={[parking.latitude, parking.longitude]}
+      icon={createParkingIcon()}
+      zIndexOffset={500}
+    >
+      <Popup>
+        <div style={{ minWidth: "200px" }}>
+          <strong
+            style={{
+              fontSize: "14px",
+              display: "block",
+              marginBottom: "8px",
+            }}
+          >
+            {parking.name || "Parking Location"}
+          </strong>
+          {parking.notes && (
+            <p style={{ margin: "4px 0", fontSize: "12px", color: "#666" }}>
+              {parking.notes}
+            </p>
+          )}
+          <p style={{ margin: "4px 0", fontSize: "12px", color: "#666" }}>
+            {parking.latitude.toFixed(5)}, {parking.longitude.toFixed(5)}
+          </p>
+          <p style={{ margin: "4px 0", fontSize: "11px", color: "#999" }}>
+            {new Date(parking.created_at).toLocaleString()}
+          </p>
+          {onDelete && (
+            <button
+              onClick={() => onDelete(parking.id)}
+              style={{
+                marginTop: "8px",
+                padding: "4px 8px",
+                backgroundColor: "#ef4444",
+                color: "white",
+                border: "none",
+                borderRadius: "4px",
+                cursor: "pointer",
+                fontSize: "12px",
+              }}
+            >
+              Delete
+            </button>
+          )}
+        </div>
+      </Popup>
+    </Marker>
+  );
+}
+
 function getStatusColor(etatDeneig: number): string {
   const colorMap: Record<number, string> = {
     0: "#ff9671",
@@ -317,6 +450,10 @@ export default function SnowMap({
   onPlanificationClick,
   onBoundsChange,
   enableDynamicFetching = false,
+  onMapClick,
+  parkingLocations = [],
+  onParkingLocationDelete,
+  selectedParkingLocationId = null,
 }: SnowMapProps) {
   const geoJsonFeatures = useMemo(() => {
     return planifications
@@ -481,6 +618,7 @@ export default function SnowMap({
         onBoundsChange={onBoundsChange}
         enableDynamicFetching={enableDynamicFetching}
       />
+      <MapClickHandler onMapClick={onMapClick} />
       <GeoJSON
         key={`${selectedPlanification?.coteRueId || "all"}-${dataHash}`}
         data={geoJsonFeatures as any}
@@ -547,6 +685,14 @@ export default function SnowMap({
           </Popup>
         </Marker>
       )}
+      {parkingLocations.map((parking) => (
+        <ParkingMarker
+          key={parking.id}
+          parking={parking}
+          isSelected={selectedParkingLocationId === parking.id}
+          onDelete={onParkingLocationDelete}
+        />
+      ))}
     </MapContainer>
   );
 }

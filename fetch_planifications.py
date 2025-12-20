@@ -195,6 +195,7 @@ def ingest(api_response: list, gbdouble_mapping: Dict[int, Dict[str, Any]] = Non
     upserted_streets_count = 0
     skipped_streets_count = 0
     upserted_current_count = 0
+    # https://donnees.montreal.ca/dataset/geobase-double/resource/16f7fa0a-9ce6-4b29-a7fc-00842c593927
     
     for item in api_response:
         cote_rue_id = item.get('coteRueId')

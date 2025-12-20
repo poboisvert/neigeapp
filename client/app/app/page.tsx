@@ -8,6 +8,15 @@ import { SegmentControl } from "@/components/ui/segment-control";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import {
   MapPin,
   Snowflake,
   RefreshCw,
@@ -23,6 +32,7 @@ import {
   Bell,
   ChevronDown,
   ChevronUp,
+  Car,
 } from "lucide-react";
 import {
   supabase,
@@ -69,6 +79,19 @@ export default function MapApp() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [notificationCollapsed, setNotificationCollapsed] = useState(false);
+  const [parkingLocations, setParkingLocations] = useState<any[]>([]);
+  const [showParkingDialog, setShowParkingDialog] = useState(false);
+  const [clickedParkingLocation, setClickedParkingLocation] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
+  const [parkingName, setParkingName] = useState("");
+  const [parkingNotes, setParkingNotes] = useState("");
+  const [parkingModeEnabled, setParkingModeEnabled] = useState(false);
+  const [selectedParkingLocationId, setSelectedParkingLocationId] = useState<
+    string | null
+  >(null);
+  const [showParkingMessage, setShowParkingMessage] = useState(false);
 
   const getEtatDeneigColor = (etatDeneig: number): string => {
     const colorMap: Record<number, string> = {
@@ -365,7 +388,99 @@ export default function MapApp() {
 
   useEffect(() => {
     loadFavorites();
+    loadParkingLocations();
   }, [user]);
+
+  const loadParkingLocations = async () => {
+    if (!user) {
+      setParkingLocations([]);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from("parking_locations")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error("Error loading parking locations:", error);
+        throw error;
+      }
+
+      setParkingLocations(data || []);
+    } catch (error) {
+      console.error("Error loading parking locations:", error);
+    }
+  };
+
+  const handleMapClick = (lat: number, lng: number) => {
+    // Only handle map click if parking mode is enabled
+    if (!parkingModeEnabled) return;
+
+    if (!user) {
+      setShowAuthModal(true);
+      return;
+    }
+    setClickedParkingLocation({ lat, lng });
+    setParkingName("");
+    setParkingNotes("");
+    setShowParkingDialog(true);
+  };
+
+  const saveParkingLocation = async () => {
+    if (!user || !clickedParkingLocation) return;
+
+    try {
+      const { data, error } = await supabase
+        .from("parking_locations")
+        .insert({
+          user_id: user.id,
+          latitude: clickedParkingLocation.lat,
+          longitude: clickedParkingLocation.lng,
+          name: parkingName || null,
+          notes: parkingNotes || null,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error("Error saving parking location:", error);
+        throw error;
+      }
+
+      setParkingLocations((prev) => [data, ...prev]);
+      setShowParkingDialog(false);
+      setClickedParkingLocation(null);
+      setParkingName("");
+      setParkingNotes("");
+      setParkingModeEnabled(false);
+    } catch (error) {
+      console.error("Error saving parking location:", error);
+    }
+  };
+
+  const deleteParkingLocation = async (id: string) => {
+    if (!user) return;
+
+    try {
+      const { error } = await supabase
+        .from("parking_locations")
+        .delete()
+        .eq("id", id)
+        .eq("user_id", user.id);
+
+      if (error) {
+        console.error("Error deleting parking location:", error);
+        throw error;
+      }
+
+      setParkingLocations((prev) => prev.filter((p) => p.id !== id));
+    } catch (error) {
+      console.error("Error deleting parking location:", error);
+    }
+  };
 
   useEffect(() => {
     if (!user) {
@@ -429,12 +544,21 @@ export default function MapApp() {
 
   const filteredPlanifications = useMemo(() => {
     if (filterMode === "favorites") {
-      return mergedPlanifications.filter((p: any) =>
+      const favoriteStreets = mergedPlanifications.filter((p: any) =>
         favorites.has(p.coteRueId)
       );
+
+      // Add parking locations to favorites view
+      const parkingItems = parkingLocations.map((parking: any) => ({
+        id: `parking-${parking.id}`,
+        type: "parking",
+        parking: parking,
+      }));
+
+      return [...favoriteStreets, ...parkingItems];
     }
     return mergedPlanifications;
-  }, [mergedPlanifications, filterMode, favorites]);
+  }, [mergedPlanifications, filterMode, favorites, parkingLocations]);
 
   const handleSearchInputChange = async (value: string) => {
     setSearchQuery(value);
@@ -546,30 +670,14 @@ export default function MapApp() {
             />
           )}
         </Button>
-        <a
-          href='/'
-          className={`inline-flex items-center gap-2 transition-colors`}
-        >
-          <ArrowLeft
-            className={`h-4 w-4 ${
-              darkMode ? "text-gray-300" : "text-gray-700"
-            }`}
-          />
-          <span
-            className={`text-sm font-medium ${
-              darkMode ? "text-gray-400" : "text-gray-900"
-            }`}
-          >
-            Home
-          </span>
-        </a>
+
         <div className='flex items-center gap-1 flex-1'>
           <h1
             className={`text-2xl ${
               darkMode ? "text-gray-100" : "text-gray-900"
             } flex items-baseline`}
           >
-            <span className='font-patrick-hand text-3xl'>Hello-Neige</span>
+            <span className='font-patrick-hand text-3xl'>Neige.app</span>
           </h1>
         </div>
         <Button
@@ -744,8 +852,8 @@ export default function MapApp() {
               } mb-3`}
             >
               {filteredPlanifications.length}{" "}
-              {filteredPlanifications.length === 1 ? "street" : "streets"}
-              {filterMode === "favorites" && " (favorites)"}
+              {filteredPlanifications.length === 1 ? "item" : "items"}
+              {filterMode === "favorites" && " (favorites & parking)"}
             </p>
             <div className='mb-3 flex justify-center'>
               <SegmentControl
@@ -781,102 +889,200 @@ export default function MapApp() {
 
           <div className='flex-1 overflow-y-auto p-4'>
             <div className='space-y-2'>
-              {filteredPlanifications.map((planif: any, index: number) => (
-                <div
-                  key={index}
-                  className={`p-3 rounded-lg border transition-all relative ${
-                    selectedPlanif === planif
-                      ? darkMode
-                        ? "bg-blue-900/30 border-blue-500"
-                        : "bg-blue-50 border-blue-300"
-                      : darkMode
-                      ? "bg-gray-700 border-gray-600 hover:bg-blue-900/20 hover:border-blue-500"
-                      : "bg-gray-50 border-gray-200 hover:bg-blue-50 hover:border-blue-300"
-                  }`}
-                >
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleFavorite(planif.coteRueId);
-                    }}
-                    className={`absolute top-2 right-2 p-1 rounded-full ${
-                      darkMode ? "hover:bg-gray-600" : "hover:bg-gray-200"
-                    } transition-colors`}
-                  >
-                    <Star
-                      className={`h-4 w-4 ${
-                        favorites.has(planif.coteRueId)
-                          ? "fill-red-500 text-red-500"
-                          : "text-gray-400"
-                      }`}
-                    />
-                  </button>
-                  <div
-                    className='space-y-1 pr-8 cursor-pointer'
-                    onClick={() => {
-                      setSelectedPlanif(planif);
-                      setZoomTrigger((prev) => prev + 1);
-                      setSidebarOpen(false);
-                    }}
-                  >
-                    <p
-                      className={`font-medium text-sm ${
-                        darkMode ? "text-gray-100" : "text-gray-900"
+              {filteredPlanifications.map((item: any, index: number) => {
+                // Handle parking locations
+                if (item.type === "parking") {
+                  const parking = item.parking;
+                  return (
+                    <div
+                      key={item.id}
+                      className={`p-3 rounded-lg border transition-all relative ${
+                        darkMode
+                          ? "bg-gray-700 border-gray-600 hover:bg-blue-900/20 hover:border-blue-500"
+                          : "bg-gray-50 border-gray-200 hover:bg-blue-50 hover:border-blue-300"
                       }`}
                     >
-                      {planif.streetFeature?.properties?.NOM_VOIE}{" "}
-                      {planif.streetFeature?.properties?.TYPE_F}
-                    </p>
-                    <div className='flex items-center gap-2'>
-                      <div
-                        className='w-3 h-3 rounded-full'
-                        style={{
-                          backgroundColor: getEtatDeneigColor(
-                            planif.etatDeneig
-                          ),
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (
+                            confirm(
+                              "Are you sure you want to delete this parking location?"
+                            )
+                          ) {
+                            deleteParkingLocation(parking.id);
+                          }
                         }}
-                      />
-                      <p
-                        className={`text-xs ${
-                          darkMode ? "text-gray-300" : "text-gray-600"
-                        }`}
+                        className={`absolute top-2 right-2 p-1 rounded-full ${
+                          darkMode ? "hover:bg-gray-600" : "hover:bg-gray-200"
+                        } transition-colors`}
+                        title='Delete parking location'
                       >
-                        <span className='font-medium'>
-                          {getEtatDeneigStatus(planif.etatDeneig)}
-                        </span>
-                      </p>
-                    </div>
-                    <p
-                      className={`text-xs ${
-                        darkMode ? "text-gray-400" : "text-gray-500"
-                      }`}
-                    >
-                      {planif.streetFeature?.properties?.NOM_VILLE} •{" "}
-                      {planif.streetFeature?.properties?.COTE}
-                    </p>
-                    {/* 
-                      Only show the address if the value is not 0 or undefined/null.
-                      Prevents rendering "0" as a valid address.
-                    */}
-                    {planif.streetFeature?.properties?.DEBUT_ADRESSE !==
-                      undefined &&
-                      planif.streetFeature?.properties?.DEBUT_ADRESSE !==
-                        null &&
-                      Number(
-                        planif.streetFeature?.properties?.DEBUT_ADRESSE
-                      ) !== 0 && (
+                        <X className='h-4 w-4 text-gray-400 hover:text-red-500' />
+                      </button>
+                      <div
+                        className='space-y-1 pr-8 cursor-pointer'
+                        onClick={() => {
+                          // Zoom to parking location and select it
+                          setSearchLocation(null); // Clear search location to avoid showing search marker
+                          setSelectedParkingLocationId(parking.id);
+                          // Set search location for zooming, but clear it after a moment so parking popup shows
+                          setSearchLocation({
+                            lat: parking.latitude,
+                            lng: parking.longitude,
+                            zoom: 18,
+                          });
+                          // Clear search location after map has zoomed so parking popup shows
+                          setTimeout(() => {
+                            setSearchLocation(null);
+                          }, 500);
+                          setSidebarOpen(false);
+                        }}
+                      >
+                        <div className='flex items-center gap-2'>
+                          <div
+                            className={`flex items-center justify-center w-6 h-6 rounded-full ${
+                              darkMode ? "bg-blue-600" : "bg-blue-500"
+                            } text-white text-xs font-bold`}
+                          >
+                            P
+                          </div>
+                          <p
+                            className={`font-medium text-sm ${
+                              darkMode ? "text-gray-100" : "text-gray-900"
+                            }`}
+                          >
+                            {parking.name || "Parking Location"}
+                          </p>
+                        </div>
+                        {parking.notes && (
+                          <p
+                            className={`text-xs ${
+                              darkMode ? "text-gray-300" : "text-gray-600"
+                            }`}
+                          >
+                            {parking.notes}
+                          </p>
+                        )}
                         <p
                           className={`text-xs ${
                             darkMode ? "text-gray-400" : "text-gray-500"
                           }`}
                         >
-                          Address:{" "}
-                          {planif.streetFeature?.properties?.DEBUT_ADRESSE}
+                          {parking.latitude.toFixed(5)},{" "}
+                          {parking.longitude.toFixed(5)}
                         </p>
-                      )}
+                        <p
+                          className={`text-xs ${
+                            darkMode ? "text-gray-400" : "text-gray-500"
+                          }`}
+                        >
+                          {new Date(parking.created_at).toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                }
+
+                // Handle regular planifications
+                const planif = item;
+                return (
+                  <div
+                    key={index}
+                    className={`p-3 rounded-lg border transition-all relative ${
+                      selectedPlanif === planif
+                        ? darkMode
+                          ? "bg-blue-900/30 border-blue-500"
+                          : "bg-blue-50 border-blue-300"
+                        : darkMode
+                        ? "bg-gray-700 border-gray-600 hover:bg-blue-900/20 hover:border-blue-500"
+                        : "bg-gray-50 border-gray-200 hover:bg-blue-50 hover:border-blue-300"
+                    }`}
+                  >
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleFavorite(planif.coteRueId);
+                      }}
+                      className={`absolute top-2 right-2 p-1 rounded-full ${
+                        darkMode ? "hover:bg-gray-600" : "hover:bg-gray-200"
+                      } transition-colors`}
+                    >
+                      <Star
+                        className={`h-4 w-4 ${
+                          favorites.has(planif.coteRueId)
+                            ? "fill-red-500 text-red-500"
+                            : "text-gray-400"
+                        }`}
+                      />
+                    </button>
+                    <div
+                      className='space-y-1 pr-8 cursor-pointer'
+                      onClick={() => {
+                        setSelectedPlanif(planif);
+                        setZoomTrigger((prev) => prev + 1);
+                        setSidebarOpen(false);
+                      }}
+                    >
+                      <p
+                        className={`font-medium text-sm ${
+                          darkMode ? "text-gray-100" : "text-gray-900"
+                        }`}
+                      >
+                        {planif.streetFeature?.properties?.NOM_VOIE}{" "}
+                        {planif.streetFeature?.properties?.TYPE_F}
+                      </p>
+                      <div className='flex items-center gap-2'>
+                        <div
+                          className='w-3 h-3 rounded-full'
+                          style={{
+                            backgroundColor: getEtatDeneigColor(
+                              planif.etatDeneig
+                            ),
+                          }}
+                        />
+                        <p
+                          className={`text-xs ${
+                            darkMode ? "text-gray-300" : "text-gray-600"
+                          }`}
+                        >
+                          <span className='font-medium'>
+                            {getEtatDeneigStatus(planif.etatDeneig)}
+                          </span>
+                        </p>
+                      </div>
+                      <p
+                        className={`text-xs ${
+                          darkMode ? "text-gray-400" : "text-gray-500"
+                        }`}
+                      >
+                        {planif.streetFeature?.properties?.NOM_VILLE} •{" "}
+                        {planif.streetFeature?.properties?.COTE}
+                      </p>
+                      {/* 
+                        Only show the address if the value is not 0 or undefined/null.
+                        Prevents rendering "0" as a valid address.
+                      */}
+                      {planif.streetFeature?.properties?.DEBUT_ADRESSE !==
+                        undefined &&
+                        planif.streetFeature?.properties?.DEBUT_ADRESSE !==
+                          null &&
+                        Number(
+                          planif.streetFeature?.properties?.DEBUT_ADRESSE
+                        ) !== 0 && (
+                          <p
+                            className={`text-xs ${
+                              darkMode ? "text-gray-400" : "text-gray-500"
+                            }`}
+                          >
+                            Address:{" "}
+                            {planif.streetFeature?.properties?.DEBUT_ADRESSE}
+                          </p>
+                        )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
               {filteredPlanifications.length === 0 && !loading && (
                 <div className='text-center py-12'>
                   {filterMode === "favorites" ? (
@@ -931,6 +1137,53 @@ export default function MapApp() {
         </aside>
 
         <main className='flex-1 relative'>
+          {/* Parking Mode Toggle Button */}
+          <div className='absolute top-4 right-4 z-10'>
+            <Button
+              onClick={() => {
+                const newValue = !parkingModeEnabled;
+                setParkingModeEnabled(newValue);
+                if (newValue) {
+                  // Show message for 5 seconds when parking mode is enabled
+                  setShowParkingMessage(true);
+                  setTimeout(() => {
+                    setShowParkingMessage(false);
+                  }, 5000);
+                }
+              }}
+              className={`shadow-lg transition-all ${
+                parkingModeEnabled
+                  ? "bg-[#22c55e] hover:bg-[#16a34a] text-white"
+                  : "bg-[#6b7280] hover:bg-[#4b5563] text-white"
+              }`}
+              size='icon'
+              title={
+                parkingModeEnabled
+                  ? "Click map to save parking location (Click again to disable)"
+                  : "Enable parking location saving"
+              }
+            >
+              <Car className='h-5 w-5' />
+            </Button>
+          </div>
+
+          {/* Parking Mode Message */}
+          {showParkingMessage && (
+            <div className='absolute top-20 right-4 z-20 animate-in fade-in slide-in-from-top-2'>
+              <div
+                className={`rounded-lg shadow-lg px-4 py-3 ${
+                  darkMode
+                    ? "bg-[#22c55e] text-white"
+                    : "bg-[#22c55e] text-white"
+                }`}
+              >
+                <p className='text-sm font-medium'>
+                  Veuillez cliquer sur la carte pour enregistrer le
+                  stationnement
+                </p>
+              </div>
+            </div>
+          )}
           <div className='absolute top-4 left-1/2 -translate-x-1/2 z-10 w-full max-w-md px-4'>
             <form onSubmit={handleSearch} className='relative search-container'>
               <div className='flex gap-2'>
@@ -1032,6 +1285,10 @@ export default function MapApp() {
               }}
               onBoundsChange={handleBoundsChange}
               enableDynamicFetching={true}
+              onMapClick={handleMapClick}
+              parkingLocations={parkingLocations}
+              onParkingLocationDelete={deleteParkingLocation}
+              selectedParkingLocationId={selectedParkingLocationId}
             />
           ) : (
             <div className='relative w-full h-full'>
@@ -1138,6 +1395,80 @@ export default function MapApp() {
               </div>
             </div>
           )}
+
+          {/* Parking Location Dialog */}
+          <Dialog open={showParkingDialog} onOpenChange={setShowParkingDialog}>
+            <DialogContent className={darkMode ? "bg-gray-800" : ""}>
+              <DialogHeader>
+                <DialogTitle className={darkMode ? "text-gray-100" : ""}>
+                  Save Parking Location
+                </DialogTitle>
+                <DialogDescription className={darkMode ? "text-gray-400" : ""}>
+                  Click on the map to mark where you parked your car. Add a name
+                  and notes to help you remember.
+                </DialogDescription>
+              </DialogHeader>
+              <div className='space-y-4 py-4'>
+                {clickedParkingLocation && (
+                  <div className='space-y-2'>
+                    <p
+                      className={`text-sm ${
+                        darkMode ? "text-gray-300" : "text-gray-600"
+                      }`}
+                    >
+                      Location: {clickedParkingLocation.lat.toFixed(5)},{" "}
+                      {clickedParkingLocation.lng.toFixed(5)}
+                    </p>
+                    <Input
+                      placeholder='Parking location name (optional)'
+                      value={parkingName}
+                      onChange={(e) => setParkingName(e.target.value)}
+                      className={
+                        darkMode
+                          ? "bg-gray-700 border-gray-600 text-gray-100"
+                          : ""
+                      }
+                    />
+                    <Textarea
+                      placeholder='Notes (optional)'
+                      value={parkingNotes}
+                      onChange={(e) => setParkingNotes(e.target.value)}
+                      rows={3}
+                      className={
+                        darkMode
+                          ? "bg-gray-700 border-gray-600 text-gray-100"
+                          : ""
+                      }
+                    />
+                  </div>
+                )}
+              </div>
+              <DialogFooter>
+                <Button
+                  variant='outline'
+                  onClick={() => {
+                    setShowParkingDialog(false);
+                    setClickedParkingLocation(null);
+                    setParkingName("");
+                    setParkingNotes("");
+                  }}
+                  className={
+                    darkMode
+                      ? "bg-gray-700 border-gray-600 text-gray-200 hover:bg-gray-600"
+                      : ""
+                  }
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={saveParkingLocation}
+                  className='bg-blue-600 hover:bg-blue-700 text-white'
+                >
+                  Save Parking Location
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </main>
       </div>
     </div>

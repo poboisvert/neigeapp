@@ -34,11 +34,11 @@
     "legal": "Legal",
     "privacy": "Privacy",
     "terms": "Terms",
-    "copyright": "hello-neige",
+    "copyright": "Neige.app",
     "rights": "All rights reserved."
   },
   "contact": {
-    "back": "← BACK TO hello-neige",
+    "back": "← BACK TO Neige.app",
     "title": "GET IN TOUCH",
     "subtitle": "Questions? Complaints? Plow Compliments?",
     "description": "We're all ears! (And eyes on the plows)",
@@ -95,7 +95,7 @@
   },
   "whyChooseUs": {
     "label": "why choose us",
-    "title": "WHY HELLO-NEIGE MAKES\nMONTREAL WINTERS EASIER",
+    "title": "WHY NEIGE.APP MAKES\nMONTREAL WINTERS EASIER",
     "feature1Title": "REAL-TIME\nTRACKING",
     "feature1Description": "Monitor all 19 boroughs of Montreal with live updates on snow removal operations",
     "feature2Title": "COMPREHENSIVE\nCOVERAGE",

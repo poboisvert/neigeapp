@@ -664,7 +664,7 @@ export function LandingPageTemplate({
               className='flex items-center space-x-2 text-slate-900 dark:text-slate-50 hover:opacity-80 transition-opacity'
             >
               <span className='text-xl md:text-2xl font-bold font-patrick-hand'>
-                HELLO-NEIGE
+                Neige.app
               </span>
             </Link>
 

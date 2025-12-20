@@ -131,7 +131,7 @@ export function Footer() {
         <div className='text-center'>
           <Link href='/' className='inline-block'>
             <h2 className='text-6xl md:text-8xl font-bold text-black tracking-tight'>
-              <span className='font-patrick-hand'>HELLO-NEIGE</span>
+              <span className='font-patrick-hand'>Neige.app</span>
             </h2>
           </Link>
         </div>

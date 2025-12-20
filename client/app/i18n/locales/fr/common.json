@@ -34,11 +34,11 @@
     "legal": "Légal",
     "privacy": "Confidentialité",
     "terms": "Conditions",
-    "copyright": "hello-neige",
+    "copyright": "neige.app",
     "rights": "Tous droits réservés."
   },
   "contact": {
-    "back": "← RETOUR À hello-neige",
+    "back": "← RETOUR À neige.app",
     "title": "NOUS CONTACTER",
     "subtitle": "Des questions? Des plaintes? Des compliments sur les déneigeuses?",
     "description": "Nous sommes à l'écoute! (Et les yeux sur les déneigeuses)",
@@ -60,7 +60,7 @@
     "callNumber": "1-800-DEN-EIGE\n(1-800-336-3443)",
     "callNote": "Disponible 24/7 (comme les déneigeuses!)",
     "emailUs": "Courriel",
-    "emailAddresses": "info@hello-neige\nsupport@hello-neige",
+    "emailAddresses": "info@neige.app",
     "emailNote": "Nous répondons plus vite que les déneigeuses sur la neige fraîche!",
     "quickResponse": "⚡ Temps de réponse rapides",
     "emergencyResponse": "Questions urgentes sur les déneigeuses:",
@@ -95,7 +95,7 @@
   },
   "whyChooseUs": {
     "label": "pourquoi nous choisir",
-    "title": "POURQUOI HELLO-NEIGE REND\nLES HIVERS MONTÉALAIS PLUS FACILES",
+    "title": "POURQUOI NEIGE.APP REND\nLES HIVERS MONTÉALAIS PLUS FACILES",
     "feature1Title": "SUIVI EN\nTEMPS RÉEL",
     "feature1Description": "Surveillez les 19 arrondissements de Montréal avec des mises à jour en direct sur les opérations de déneigement",
     "feature2Title": "COUVERTURE\nCOMPLÈTE",

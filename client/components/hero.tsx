@@ -21,7 +21,7 @@ export function Hero() {
       <div className='relative z-10 flex flex-col h-full'>
         <nav className='flex items-center justify-between px-8 lg:px-16 py-6'>
           <div className='text-yellow text-sm lg:text-base font-medium tracking-wider drop-shadow-lg'>
-            <span className='font-patrick-hand'>HELLO-NEIGE</span>
+            <span className='font-patrick-hand'>Neige.app</span>
           </div>
 
           <div className='hidden md:flex items-center gap-8 lg:gap-12'>
