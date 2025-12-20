@@ -2,7 +2,6 @@ import "../globals.css";
 import type { Metadata } from "next";
 import { Inter, Patrick_Hand } from "next/font/google";
 
-import { Footer } from "@/components/footer";
 import { detectLanguage } from "@/app/i18n/server";
 import { I18nProvider } from "@/app/i18n/i18n-context";
 
@@ -42,6 +41,12 @@ export default async function RootLayout({
 
   return (
     <html lang={lng}>
+      <head>
+        <meta
+          name='viewport'
+          content='width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no'
+        />
+      </head>
       <body className={`${inter.className} ${patrickHand.variable}`}>
         <I18nProvider language={lng}>{children}</I18nProvider>
       </body>
