@@ -64,7 +64,7 @@ export default function MapApp() {
     lat: number;
     lng: number;
     zoom?: number;
-  } | null>(null);
+  }>({ lat: 45.5019, lng: -73.5674, zoom: 16 });
   const [searchSuggestions, setSearchSuggestions] = useState<GeocodingResult[]>(
     []
   );
@@ -353,36 +353,6 @@ export default function MapApp() {
 
   useEffect(() => {
     loadSnowPlanning();
-  }, []);
-
-  useEffect(() => {
-    const fetchUserLocation = async () => {
-      try {
-        const response = await fetch(
-          "https://ipv4-check-perf.radar.cloudflare.com/api/info"
-        );
-        if (!response.ok) {
-          throw new Error("Failed to fetch location");
-        }
-        const data = await response.json();
-
-        // Handle different possible response formats
-        const lat = data.latitude || data.lat;
-        const lng = data.longitude || data.lng || data.lon;
-
-        if (lat && lng) {
-          setInitialCenter({
-            lat: parseFloat(lat),
-            lng: parseFloat(lng),
-            zoom: 16,
-          });
-        }
-      } catch (error) {
-        console.error("Error fetching user location:", error);
-      }
-    };
-
-    fetchUserLocation();
   }, []);
 
   useEffect(() => {
