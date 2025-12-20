@@ -1,4 +1,5 @@
-import "./globals.css";
+import "../globals.css";
+
 import type { Metadata } from "next";
 import { Inter, Patrick_Hand } from "next/font/google";
 
