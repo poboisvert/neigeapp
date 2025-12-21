@@ -32,6 +32,8 @@ import {
   ChevronDown,
   ChevronUp,
   Car,
+  Navigation,
+  Layers,
 } from "lucide-react";
 import {
   supabase,
@@ -90,6 +92,32 @@ export default function MapApp() {
     string | null
   >(null);
   const [showParkingMessage, setShowParkingMessage] = useState(false);
+  const [showStackMenu, setShowStackMenu] = useState(false);
+
+  const getCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      alert("Geolocation is not supported by your browser");
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        setSearchLocation({
+          lat: latitude,
+          lng: longitude,
+          zoom: 18,
+        });
+        setShowStackMenu(false);
+      },
+      (error) => {
+        console.error("Error getting location:", error);
+        alert(
+          "Unable to retrieve your location. Please enable location services."
+        );
+      }
+    );
+  };
 
   const getEtatDeneigColor = (etatDeneig: number): string => {
     const colorMap: Record<number, string> = {
@@ -587,6 +615,9 @@ export default function MapApp() {
       }
       if (!target.closest(".user-menu-container")) {
         setShowUserMenu(false);
+      }
+      if (!target.closest(".stack-menu-container")) {
+        setShowStackMenu(false);
       }
     };
 
@@ -1130,9 +1161,80 @@ export default function MapApp() {
             </Button>
           </div>
 
+          {/* Stack Menu Button */}
+          <div className='absolute top-20 right-4 z-20 stack-menu-container'>
+            <div className='relative'>
+              <Button
+                onClick={() => setShowStackMenu(!showStackMenu)}
+                className={`shadow-lg ${
+                  darkMode
+                    ? "bg-gray-800 hover:bg-gray-700 text-white border-gray-700"
+                    : "bg-white hover:bg-gray-50 text-gray-900 border-gray-300"
+                } border`}
+                size='icon'
+                title='More options'
+              >
+                <Layers className='h-5 w-5' />
+              </Button>
+
+              {/* Stack Menu Dropdown */}
+              {showStackMenu && (
+                <div
+                  className={`absolute top-full right-0 mt-2 rounded-lg shadow-xl border ${
+                    darkMode
+                      ? "bg-gray-800 border-gray-700"
+                      : "bg-white border-gray-200"
+                  } overflow-hidden z-30`}
+                >
+                  <button
+                    onClick={() => {
+                      const newValue = !parkingModeEnabled;
+                      setParkingModeEnabled(newValue);
+                      if (newValue) {
+                        setShowParkingMessage(true);
+                        setTimeout(() => {
+                          setShowParkingMessage(false);
+                        }, 5000);
+                      }
+                      setShowStackMenu(false);
+                    }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-opacity-80 transition-colors ${
+                      parkingModeEnabled
+                        ? darkMode
+                          ? "bg-[#22c55e] hover:bg-[#16a34a] text-white"
+                          : "bg-[#22c55e] hover:bg-[#16a34a] text-white"
+                        : darkMode
+                        ? "hover:bg-gray-700 text-gray-100"
+                        : "hover:bg-gray-50 text-gray-900"
+                    }`}
+                  >
+                    <Car className='h-4 w-4 shrink-0' />
+                    <span className='text-sm font-medium'>
+                      {parkingModeEnabled
+                        ? "Désactiver parking"
+                        : "Activer parking"}
+                    </span>
+                  </button>
+
+                  <button
+                    onClick={getCurrentLocation}
+                    className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-opacity-80 transition-colors border-t ${
+                      darkMode
+                        ? "hover:bg-gray-700 text-gray-100 border-gray-700"
+                        : "hover:bg-gray-50 text-gray-900 border-gray-200"
+                    }`}
+                  >
+                    <Navigation className='h-4 w-4 shrink-0' />
+                    <span className='text-sm font-medium'>Trouve moi</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Parking Mode Message */}
           {showParkingMessage && (
-            <div className='absolute top-20 right-4 z-20 animate-in fade-in slide-in-from-top-2'>
+            <div className='absolute top-20 right-20 z-25 animate-in fade-in slide-in-from-top-2'>
               <div
                 className={`rounded-lg shadow-lg px-4 py-3 ${
                   darkMode
