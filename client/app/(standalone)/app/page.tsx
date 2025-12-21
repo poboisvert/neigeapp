@@ -21,7 +21,6 @@ import {
   Snowflake,
   RefreshCw,
   Search,
-  Star,
   User,
   Moon,
   Sun,
@@ -34,6 +33,7 @@ import {
   Car,
   Navigation,
   Layers,
+  Heart,
 } from "lucide-react";
 import {
   supabase,
@@ -42,6 +42,7 @@ import {
   onAuthStateChange,
 } from "@/lib/auth";
 import { searchAddress, type GeocodingResult } from "@/lib/geocoding";
+import { getEtatDeneigColor, getEtatDeneigStatus } from "@/lib/constants";
 import { AuthModal } from "@/components/auth-modal";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 
@@ -51,7 +52,15 @@ const SnowMap = dynamic(() => import("@/components/map"), {
 
 export default function MapApp() {
   const [planifications, setPlanifications] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true); // Start as true to prevent empty state
+  const [hasInitialBounds, setHasInitialBounds] = useState(false);
+  const hasInitialBoundsRef = useRef(false);
+  const [currentBounds, setCurrentBounds] = useState<{
+    minLat: number;
+    minLng: number;
+    maxLat: number;
+    maxLng: number;
+  } | null>(null);
   const [selectedPlanif, setSelectedPlanif] = useState<any | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [favorites, setFavorites] = useState<Set<number>>(new Set());
@@ -93,6 +102,10 @@ export default function MapApp() {
   >(null);
   const [showParkingMessage, setShowParkingMessage] = useState(false);
   const [showStackMenu, setShowStackMenu] = useState(false);
+  const [municipalParkingEnabled, setMunicipalParkingEnabled] = useState(false);
+  const [municipalParking, setMunicipalParking] = useState<any[]>([]);
+  const [showMunicipalParkingMessage, setShowMunicipalParkingMessage] =
+    useState(false);
 
   const getCurrentLocation = () => {
     if (!navigator.geolocation) {
@@ -117,31 +130,6 @@ export default function MapApp() {
         );
       }
     );
-  };
-
-  const getEtatDeneigColor = (etatDeneig: number): string => {
-    const colorMap: Record<number, string> = {
-      0: "#ff9671",
-      1: "#22c55e",
-      2: "#3b82f6",
-      3: "#8b5cf6",
-      4: "#f9f871",
-      5: "#ef4444",
-      10: "#6b7280",
-    };
-    return colorMap[etatDeneig] || "#6b7280";
-  };
-
-  const getEtatDeneigStatus = (etatDeneig: number): string => {
-    const statusMap: Record<number, string> = {
-      1: "Déneigé",
-      2: "Planifié",
-      3: "Replanifié",
-      4: "Sera replanifié ultérieurement",
-      5: "Chargement en cours",
-      10: "Dégagé (entre 2 chargements de neige)",
-    };
-    return statusMap[etatDeneig] || "Status inconnu";
   };
 
   const loadSnowPlanning = useCallback(
@@ -199,7 +187,12 @@ export default function MapApp() {
       } catch (error) {
         console.error("Error loading snow planning:", error);
       } finally {
-        setLoading(false);
+        // Only set loading to false if we have initial bounds (data has been loaded at least once)
+        // This prevents showing empty state before map triggers initial bounds
+        // Use ref to avoid closure issues with state
+        if (hasInitialBoundsRef.current) {
+          setLoading(false);
+        }
       }
     },
     []
@@ -212,6 +205,11 @@ export default function MapApp() {
       maxLat: number;
       maxLng: number;
     }) => {
+      if (!hasInitialBoundsRef.current) {
+        hasInitialBoundsRef.current = true;
+        setHasInitialBounds(true);
+      }
+      setCurrentBounds(bounds);
       loadSnowPlanning(false, bounds);
     },
     [loadSnowPlanning]
@@ -378,13 +376,15 @@ export default function MapApp() {
     return () => subscription.unsubscribe();
   }, []);
 
-  useEffect(() => {
-    loadSnowPlanning();
-  }, []);
+  // Don't load all data initially - wait for map bounds to load viewport data
+  // This prevents showing 0 → 5000 → correct count flicker
+  // The map will trigger handleBoundsChange once initialized (via MapBoundsTracker)
+  // We skip the initial load since enableDynamicFetching is true
 
   useEffect(() => {
     loadFavorites();
     loadParkingLocations();
+    loadMunicipalParking();
   }, [user]);
 
   const loadParkingLocations = async () => {
@@ -408,6 +408,24 @@ export default function MapApp() {
       setParkingLocations(data || []);
     } catch (error) {
       console.error("Error loading parking locations:", error);
+    }
+  };
+
+  const loadMunicipalParking = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("municipal_parking")
+        .select("*")
+        .order("borough");
+
+      if (error) {
+        console.error("Error loading municipal parking:", error);
+        throw error;
+      }
+
+      setMunicipalParking(data || []);
+    } catch (error) {
+      console.error("Error loading municipal parking:", error);
     }
   };
 
@@ -845,15 +863,17 @@ export default function MapApp() {
                 darkMode ? "text-gray-400" : "text-gray-600"
               } mb-3`}
             >
-              {filteredPlanifications.length}{" "}
-              {filteredPlanifications.length === 1 ? "item" : "items"}
-              {filterMode === "favorites" && " (favorites & parking)"}
+              {loading && !hasInitialBounds
+                ? "Loading..."
+                : `${filteredPlanifications.length} ${
+                    filteredPlanifications.length === 1 ? "item" : "items"
+                  }${filterMode === "favorites" ? " (Favoris & parking)" : ""}`}
             </p>
             <div className='mb-3 flex justify-center'>
               <SegmentControl
                 options={[
-                  { value: "all", label: "All" },
-                  { value: "favorites", label: "Favorites" },
+                  { value: "all", label: "Tous" },
+                  { value: "favorites", label: "Favoris" },
                 ]}
                 value={filterMode}
                 onValueChange={setFilterMode}
@@ -862,7 +882,7 @@ export default function MapApp() {
               />
             </div>
             <Button
-              onClick={() => loadSnowPlanning(true)}
+              onClick={() => loadSnowPlanning(true, currentBounds || undefined)}
               disabled={loading}
               variant='outline'
               size='sm'
@@ -877,7 +897,7 @@ export default function MapApp() {
                   darkMode ? "text-gray-200" : "text-gray-700"
                 }`}
               />
-              Refresh Data
+              Rafraîchir les données
             </Button>
           </div>
 
@@ -1002,7 +1022,7 @@ export default function MapApp() {
                         darkMode ? "hover:bg-gray-600" : "hover:bg-gray-200"
                       } transition-colors`}
                     >
-                      <Star
+                      <Heart
                         className={`h-4 w-4 ${
                           favorites.has(planif.coteRueId)
                             ? "fill-red-500 text-red-500"
@@ -1081,7 +1101,7 @@ export default function MapApp() {
                 <div className='text-center py-12'>
                   {filterMode === "favorites" ? (
                     <>
-                      <Star
+                      <Heart
                         className={`h-12 w-12 ${
                           darkMode ? "text-gray-600" : "text-gray-300"
                         } mx-auto mb-3`}
@@ -1091,14 +1111,14 @@ export default function MapApp() {
                           darkMode ? "text-gray-400" : "text-gray-500"
                         }`}
                       >
-                        No favorites yet
+                        Aucun favori pour l’instant
                       </p>
                       <p
                         className={`text-xs ${
                           darkMode ? "text-gray-500" : "text-gray-400"
                         } mt-1`}
                       >
-                        Click the star icon to add favorites
+                        Cliquez sur l’icône le coeur pour ajouter aux favoris
                       </p>
                     </>
                   ) : (
@@ -1113,19 +1133,66 @@ export default function MapApp() {
                           darkMode ? "text-gray-400" : "text-gray-500"
                         }`}
                       >
-                        No planifications available
+                        Aucune planification disponible
                       </p>
                       <p
                         className={`text-xs ${
                           darkMode ? "text-gray-500" : "text-gray-400"
                         } mt-1`}
                       >
-                        Click Refresh Data to load
+                        Rafraîchir les données
                       </p>
                     </>
                   )}
                 </div>
               )}
+            </div>
+          </div>
+
+          {/* Sponsor Container */}
+          <div
+            className={`shrink-0 border-t ${
+              darkMode
+                ? "border-gray-700 bg-gray-800"
+                : "border-gray-200 bg-white"
+            }`}
+          >
+            <div className='p-4'>
+              <div
+                className={`rounded-lg border-2 border-dashed ${
+                  darkMode
+                    ? "border-gray-600 bg-gray-700/50"
+                    : "border-gray-300 bg-gray-50"
+                } p-6 text-center transition-all hover:border-opacity-80`}
+              >
+                <p
+                  className={`text-xs font-semibold uppercase tracking-wider mb-2 ${
+                    darkMode ? "text-gray-400" : "text-gray-500"
+                  }`}
+                >
+                  Espace Publicitaire
+                </p>
+                <div
+                  className={`h-24 flex items-center justify-center rounded ${
+                    darkMode ? "bg-gray-800" : "bg-white"
+                  }`}
+                >
+                  <p
+                    className={`text-sm ${
+                      darkMode ? "text-gray-500" : "text-gray-400"
+                    }`}
+                  >
+                    Emplacement sponsor disponible
+                  </p>
+                </div>
+                <p
+                  className={`text-xs mt-2 ${
+                    darkMode ? "text-gray-500" : "text-gray-400"
+                  }`}
+                >
+                  Contactez-nous pour réserver
+                </p>
+              </div>
             </div>
           </div>
         </aside>
@@ -1209,10 +1276,41 @@ export default function MapApp() {
                     }`}
                   >
                     <Car className='h-4 w-4 shrink-0' />
-                    <span className='text-sm font-medium'>
+                    <span className='text-sm font-medium whitespace-nowrap'>
                       {parkingModeEnabled
                         ? "Désactiver parking"
                         : "Activer parking"}
+                    </span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      const newValue = !municipalParkingEnabled;
+                      setMunicipalParkingEnabled(newValue);
+                      if (newValue) {
+                        // Show message for 5 seconds when municipal parking is enabled
+                        setShowMunicipalParkingMessage(true);
+                        setTimeout(() => {
+                          setShowMunicipalParkingMessage(false);
+                        }, 5000);
+                      }
+                      setShowStackMenu(false);
+                    }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-opacity-80 transition-colors border-t ${
+                      municipalParkingEnabled
+                        ? darkMode
+                          ? "bg-blue-600 hover:bg-blue-700 text-white border-gray-700"
+                          : "bg-blue-600 hover:bg-blue-700 text-white border-gray-200"
+                        : darkMode
+                        ? "hover:bg-gray-700 text-gray-100 border-gray-700"
+                        : "hover:bg-gray-50 text-gray-900 border-gray-200"
+                    }`}
+                  >
+                    <MapPin className='h-4 w-4 shrink-0' />
+                    <span className='text-sm font-medium whitespace-nowrap'>
+                      {municipalParkingEnabled
+                        ? "Masquer parking municipal"
+                        : "Afficher parking municipal"}
                     </span>
                   </button>
 
@@ -1225,7 +1323,9 @@ export default function MapApp() {
                     }`}
                   >
                     <Navigation className='h-4 w-4 shrink-0' />
-                    <span className='text-sm font-medium'>Trouve moi</span>
+                    <span className='text-sm font-medium whitespace-nowrap'>
+                      Trouve moi
+                    </span>
                   </button>
                 </div>
               )}
@@ -1234,18 +1334,39 @@ export default function MapApp() {
 
           {/* Parking Mode Message */}
           {showParkingMessage && (
-            <div className='absolute top-20 right-20 z-25 animate-in fade-in slide-in-from-top-2'>
-              <div
-                className={`rounded-lg shadow-lg px-4 py-3 ${
-                  darkMode
-                    ? "bg-[#22c55e] text-white"
-                    : "bg-[#22c55e] text-white"
-                }`}
-              >
-                <p className='text-sm font-medium'>
-                  Veuillez cliquer sur la carte pour enregistrer le
-                  stationnement
-                </p>
+            <div className='absolute top-4 left-4 right-20 md:left-1/2 md:-translate-x-1/2 md:right-auto md:w-full md:max-w-md z-50'>
+              <div className='mt-14'>
+                <div
+                  className={`rounded-lg shadow-lg px-4 py-3 animate-in fade-in slide-in-from-top-2 ${
+                    darkMode
+                      ? "bg-[#22c55e] text-white"
+                      : "bg-[#22c55e] text-white"
+                  }`}
+                >
+                  <p className='text-sm font-medium'>
+                    Veuillez cliquer sur la carte pour enregistrer le
+                    stationnement
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Municipal Parking Message */}
+          {showMunicipalParkingMessage && (
+            <div className='absolute top-4 left-4 right-20 md:left-1/2 md:-translate-x-1/2 md:right-auto md:w-full md:max-w-md z-50'>
+              <div className='mt-14'>
+                <div
+                  className={`rounded-lg shadow-lg px-4 py-3 animate-in fade-in slide-in-from-top-2 ${
+                    darkMode
+                      ? "bg-[#ef4444] text-white"
+                      : "bg-[#ef4444] text-white"
+                  }`}
+                >
+                  <p className='text-sm font-medium'>
+                    Les parkings public sont en rouge avec P
+                  </p>
+                </div>
               </div>
             </div>
           )}
@@ -1254,7 +1375,7 @@ export default function MapApp() {
               <div className='relative'>
                 <Input
                   type='text'
-                  placeholder='Search address in Montreal...'
+                  placeholder='Rechercher une adresse à Montréal...'
                   value={searchQuery}
                   onChange={(e) => handleSearchInputChange(e.target.value)}
                   onFocus={() =>
@@ -1350,6 +1471,8 @@ export default function MapApp() {
               parkingLocations={parkingLocations}
               onParkingLocationDelete={deleteParkingLocation}
               selectedParkingLocationId={selectedParkingLocationId}
+              loading={loading}
+              municipalParking={municipalParkingEnabled ? municipalParking : []}
             />
           ) : (
             <div className='relative w-full h-full'>
@@ -1395,20 +1518,46 @@ export default function MapApp() {
                       {getEtatDeneigStatus(selectedPlanif.etatDeneig)}
                     </p>
                   </div>
-                  <Button
-                    onClick={() => setSelectedPlanif(null)}
-                    variant='ghost'
-                    size='icon'
-                    className='text-white hover:bg-white/20 shrink-0'
-                  >
-                    <span className='text-2xl leading-none'>×</span>
-                  </Button>
+                  <div className='flex items-center gap-2'>
+                    <Button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleFavorite(selectedPlanif.coteRueId);
+                      }}
+                      variant='ghost'
+                      size='icon'
+                      className='text-white hover:bg-white/20 shrink-0'
+                      title={
+                        favorites.has(selectedPlanif.coteRueId)
+                          ? "Remove from favorites"
+                          : "Add to favorites"
+                      }
+                    >
+                      <Heart
+                        className={`h-5 w-5 ${
+                          favorites.has(selectedPlanif.coteRueId)
+                            ? "fill-white text-white"
+                            : "text-white/70"
+                        }`}
+                      />
+                    </Button>
+                    <Button
+                      onClick={() => setSelectedPlanif(null)}
+                      variant='ghost'
+                      size='icon'
+                      className='text-white hover:bg-white/20 shrink-0 group'
+                    >
+                      <span className='text-2xl leading-none text-white group-hover:text-white'>
+                        ×
+                      </span>
+                    </Button>
+                  </div>
                 </div>
 
                 <div className='grid grid-cols-2 md:grid-cols-4 gap-4'>
                   <div>
                     <p className='text-white/70 text-xs uppercase font-semibold mb-1'>
-                      Municipality
+                      Municipalité
                     </p>
                     <p className='text-white font-medium'>
                       {selectedPlanif.streetFeature?.properties?.NOM_VILLE}
@@ -1416,7 +1565,7 @@ export default function MapApp() {
                   </div>
                   <div>
                     <p className='text-white/70 text-xs uppercase font-semibold mb-1'>
-                      Side
+                      Côté
                     </p>
                     <p className='text-white font-medium'>
                       {selectedPlanif.streetFeature?.properties?.COTE}
@@ -1425,7 +1574,7 @@ export default function MapApp() {
                   {selectedPlanif.streetFeature?.properties?.DEBUT_ADRESSE && (
                     <div>
                       <p className='text-white/70 text-xs uppercase font-semibold mb-1'>
-                        Address Range
+                        Plage d’adresses
                       </p>
                       <p className='text-white font-medium'>
                         {
@@ -1445,7 +1594,7 @@ export default function MapApp() {
                   {selectedPlanif.dateMaj && (
                     <div>
                       <p className='text-white/70 text-xs uppercase font-semibold mb-1'>
-                        Last Updated
+                        Dernière mise à jour
                       </p>
                       <p className='text-white font-medium'>
                         {new Date(selectedPlanif.dateMaj).toLocaleDateString()}

@@ -15,6 +15,7 @@ import {
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { PlanificationResponse } from "@/lib/api";
+import { getEtatDeneigColor } from "@/lib/constants";
 
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -72,6 +73,36 @@ const createParkingIcon = () => {
   });
 };
 
+const createMunicipalParkingIcon = () => {
+  return L.divIcon({
+    className: "municipal-parking-marker",
+    html: `
+      <div style="
+        background-color: #ef4444;
+        width: 28px;
+        height: 28px;
+        border-radius: 50% 50% 50% 0;
+        transform: rotate(-45deg);
+        border: 2px solid white;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      ">
+        <span style="
+          transform: rotate(45deg);
+          color: white;
+          font-weight: bold;
+          font-size: 14px;
+        ">P</span>
+      </div>
+    `,
+    iconSize: [28, 28],
+    iconAnchor: [14, 28],
+    popupAnchor: [0, -28],
+  });
+};
+
 interface ParkingLocation {
   id: string;
   latitude: number;
@@ -79,6 +110,23 @@ interface ParkingLocation {
   name?: string | null;
   notes?: string | null;
   created_at: string;
+}
+
+interface MunicipalParkingLocation {
+  id: string;
+  station_id: string;
+  borough: string;
+  number_of_spaces?: number | null;
+  latitude: number;
+  longitude: number;
+  jurisdiction?: string | null;
+  location_fr?: string | null;
+  location_en?: string | null;
+  hours_fr?: string | null;
+  hours_en?: string | null;
+  note_fr?: string | null;
+  note_en?: string | null;
+  payment_type?: string | null;
 }
 
 interface SnowMapProps {
@@ -100,6 +148,8 @@ interface SnowMapProps {
   parkingLocations?: ParkingLocation[];
   onParkingLocationDelete?: (id: string) => void;
   selectedParkingLocationId?: string | null;
+  loading?: boolean;
+  municipalParking?: MunicipalParkingLocation[];
 }
 
 function FitBounds({
@@ -348,7 +398,7 @@ function ParkingMarker({
                 fontSize: "12px",
               }}
             >
-              Delete
+              Supprimer
             </button>
           )}
         </div>
@@ -357,17 +407,90 @@ function ParkingMarker({
   );
 }
 
-function getStatusColor(etatDeneig: number): string {
-  const colorMap: Record<number, string> = {
-    0: "#ff9671",
-    1: "#22c55e",
-    2: "#3b82f6",
-    3: "#8b5cf6",
-    4: "#f9f871",
-    5: "#ef4444",
-    10: "#6b7280",
+function MunicipalParkingMarker({
+  parking,
+}: {
+  parking: MunicipalParkingLocation;
+}) {
+  const openGoogleMapsDirections = () => {
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${parking.latitude},${parking.longitude}`;
+    window.open(url, "_blank");
   };
-  return colorMap[etatDeneig] || "#6b7280";
+
+  return (
+    <Marker
+      position={[parking.latitude, parking.longitude]}
+      icon={createMunicipalParkingIcon()}
+      zIndexOffset={400}
+    >
+      <Popup>
+        <div style={{ minWidth: "250px", maxWidth: "300px" }}>
+          <strong
+            style={{
+              fontSize: "14px",
+              display: "block",
+              marginBottom: "8px",
+            }}
+          >
+            {Buffer.from(String(parking.location_fr), "latin1").toString(
+              "utf8"
+            )}
+          </strong>
+          <p style={{ margin: "4px 0", fontSize: "12px", color: "#666" }}>
+            <strong>Arrondissement:</strong>{" "}
+            {Buffer.from(String(parking.borough), "latin1").toString("utf8")}
+          </p>
+          {parking.number_of_spaces && (
+            <p style={{ margin: "4px 0", fontSize: "12px", color: "#666" }}>
+              <strong>Places:</strong> {parking.number_of_spaces}
+            </p>
+          )}
+          {parking.hours_fr && (
+            <p style={{ margin: "4px 0", fontSize: "12px", color: "#666" }}>
+              <strong>Heures:</strong>{" "}
+              {Buffer.from(String(parking.hours_fr), "latin1").toString("utf8")}
+            </p>
+          )}
+          {parking.note_fr && (
+            <p style={{ margin: "4px 0", fontSize: "12px", color: "#666" }}>
+              {Buffer.from(String(parking.note_fr), "latin1").toString("utf8")}
+            </p>
+          )}
+          {parking.jurisdiction && (
+            <p style={{ margin: "4px 0", fontSize: "11px", color: "#999" }}>
+              {Buffer.from(String(parking.jurisdiction), "latin1").toString(
+                "utf8"
+              )}
+            </p>
+          )}
+          <button
+            onClick={openGoogleMapsDirections}
+            style={{
+              marginTop: "8px",
+              padding: "6px 12px",
+              backgroundColor: "#4285f4",
+              color: "white",
+              border: "none",
+              borderRadius: "4px",
+              cursor: "pointer",
+              fontSize: "12px",
+              fontWeight: "500",
+              width: "100%",
+              transition: "background-color 0.2s",
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.backgroundColor = "#357ae8";
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.backgroundColor = "#4285f4";
+            }}
+          >
+            Directions dans Google Maps
+          </button>
+        </div>
+      </Popup>
+    </Marker>
+  );
 }
 
 function calculateMidpointOnLine(
@@ -455,7 +578,13 @@ export default function SnowMap({
   parkingLocations = [],
   onParkingLocationDelete,
   selectedParkingLocationId = null,
+  loading = false,
+  municipalParking = [],
 }: SnowMapProps) {
+  const [visibleMarkerCount, setVisibleMarkerCount] = useState(0);
+  const markersBatchSize = 50; // Render 50 markers at a time
+  const markerRenderDelay = 10; // 10ms delay between batches
+
   const geoJsonFeatures = useMemo(() => {
     return planifications
       .filter((p) => p.streetFeature)
@@ -520,13 +649,70 @@ export default function SnowMap({
 
         return {
           position: midpoint,
-          color: getStatusColor(p.etatDeneig),
+          color: getEtatDeneigColor(p.etatDeneig),
           planification: p,
           isSelected: selectedPlanification?.coteRueId === p.coteRueId,
         };
       })
       .filter((m): m is NonNullable<typeof m> => m !== null);
   }, [planifications, selectedPlanification]);
+
+  // Reset visible count when markers change and gradually render them
+  useEffect(() => {
+    setVisibleMarkerCount(0);
+    const totalMarkers = centerMarkers.length;
+
+    if (totalMarkers === 0) return;
+
+    // Gradually render markers in batches
+    let currentCount = 0;
+    const timeoutIds: NodeJS.Timeout[] = [];
+
+    const renderNextBatch = () => {
+      if (currentCount < totalMarkers) {
+        currentCount = Math.min(currentCount + markersBatchSize, totalMarkers);
+        setVisibleMarkerCount(currentCount);
+
+        if (currentCount < totalMarkers) {
+          const timeoutId = setTimeout(renderNextBatch, markerRenderDelay);
+          timeoutIds.push(timeoutId);
+        }
+      }
+    };
+
+    // Start rendering after a small initial delay
+    const initialTimeout = setTimeout(renderNextBatch, markerRenderDelay);
+    timeoutIds.push(initialTimeout);
+
+    return () => {
+      timeoutIds.forEach((id) => clearTimeout(id));
+    };
+  }, [centerMarkers.length, dataHash]);
+
+  // Get visible markers (prioritize selected marker)
+  const visibleMarkers = useMemo(() => {
+    if (visibleMarkerCount >= centerMarkers.length) {
+      return centerMarkers;
+    }
+
+    const visible = centerMarkers.slice(0, visibleMarkerCount);
+    const visibleIds = new Set(visible.map((m) => m.planification.coteRueId));
+
+    // Always include selected marker if it exists and isn't already visible
+    if (selectedPlanification) {
+      const selectedMarker = centerMarkers.find(
+        (m) => m.planification.coteRueId === selectedPlanification.coteRueId
+      );
+      if (
+        selectedMarker &&
+        !visibleIds.has(selectedMarker.planification.coteRueId)
+      ) {
+        visible.push(selectedMarker);
+      }
+    }
+
+    return visible;
+  }, [centerMarkers, visibleMarkerCount, selectedPlanification]);
 
   const defaultCenter: [number, number] = [45.5017, -73.5673];
 
@@ -536,7 +722,7 @@ export default function SnowMap({
       selectedPlanification?.coteRueId === feature?.properties?.COTE_RUE_ID;
 
     return {
-      color: getStatusColor(etatDeneig),
+      color: getEtatDeneigColor(etatDeneig),
       weight: isSelected ? 6 : 4,
       opacity: isSelected ? 1 : 0.8,
     };
@@ -582,7 +768,9 @@ export default function SnowMap({
     }
   };
 
-  if (geoJsonFeatures.length === 0) {
+  // Don't show empty state while loading - show map tiles instead
+  // Only show empty state if we're not loading and have no data
+  if (geoJsonFeatures.length === 0 && !loading) {
     return (
       <div
         className={`flex h-full w-full items-center justify-center ${
@@ -628,7 +816,7 @@ export default function SnowMap({
         style={styleFeature}
         onEachFeature={onEachFeature}
       />
-      {centerMarkers.map((marker, index) => (
+      {visibleMarkers.map((marker, index) => (
         <CircleMarker
           key={`marker-${marker.planification.coteRueId}-${index}`}
           center={marker.position}
@@ -695,6 +883,9 @@ export default function SnowMap({
           isSelected={selectedParkingLocationId === parking.id}
           onDelete={onParkingLocationDelete}
         />
+      ))}
+      {municipalParking.map((parking) => (
+        <MunicipalParkingMarker key={parking.id} parking={parking} />
       ))}
     </MapContainer>
   );

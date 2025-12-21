@@ -10,6 +10,7 @@ from supabase import create_client
 from shapely.geometry import shape, LineString
 import psycopg2
 from psycopg2.extras import Json as PGJson
+import requests
 
 # Load environment variables from .env file
 load_dotenv()
@@ -63,7 +64,7 @@ class PlanifNeigeClient:
         """Get planification data from API for all streets since a specified date"""
         if from_date is None:
             raise ValueError("from_date parameter is required")
-        print('from_date', from_date)
+
         request = {'fromDate': str(from_date), 'tokenString': self.token}
         response = self.client.service.GetPlanificationsForDate(request)
         result = zeep.helpers.serialize_object(response)
@@ -320,7 +321,7 @@ def upsert_street(feature: Dict[str, Any], db_conn=None) -> Optional[Dict[str, A
                             debut_adresse, fin_adresse, cote, type_f, sens_cir,
                             street_feature, updated_at
                         ) VALUES (
-                            %(cote_ruxre_id)s, %(id_trc)s, %(id_voie)s, %(nom_voie)s, %(nom_ville)s,
+                            %(cote_rue_id)s, %(id_trc)s, %(id_voie)s, %(nom_voie)s, %(nom_ville)s,
                             %(debut_adresse)s, %(fin_adresse)s, %(cote)s, %(type_f)s, %(sens_cir)s,
                             %(street_feature)s, now()
                         )
@@ -375,16 +376,25 @@ def main():
     client = PlanifNeigeClient(token)
     
     # Use 60 days ago to get all recent planifications
-    from_date = (datetime.now() - timedelta(days=6)).replace(microsecond=0, second=0, minute=0).isoformat()
+    from_date = datetime.now().replace(microsecond=0, second=0, minute=0).isoformat()
     print(f"Fetching planifications from date: {from_date}")
     print("=" * 80)
     
     # Load gbdouble.json to get street features
     gbdouble_mapping = {}
     try:
-        print("Loading gbdouble.json...")
-        with open("gbdouble.json", "r", encoding="utf-8") as f:
-            geojson_data = json.load(f)
+        # https://donnees.montreal.ca/dataset/geobase-double
+        gbdouble_url = "https://donnees.montreal.ca/dataset/88493b16-220f-4709-b57b-1ea57c5ba405/resource/16f7fa0a-9ce6-4b29-a7fc-00842c593927/download/gbdouble.json"
+        print("Downloading the latest gbdouble.json...")
+
+        try:
+            response = requests.get(gbdouble_url)
+            response.raise_for_status()
+            geojson_data = response.json()
+            print("Successfully downloaded latest gbdouble.json")
+        except Exception as e:
+            print(f"ERROR: Failed to download gbdouble.json: {e}")
+            return 1
         
         features = geojson_data.get("features", [])
         for feature in features:

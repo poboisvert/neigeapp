@@ -3,6 +3,7 @@
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
+import { Navbar } from "@/components/navbar";
 
 export function Hero() {
   const { t } = useTranslation("common");
@@ -18,34 +19,9 @@ export function Hero() {
         <div className='absolute inset-0 bg-gradient-to-b from-black/50 via-black/40 to-black/60' />
       </div>
 
-      <div className='relative z-10 flex flex-col h-full'>
-        <nav className='flex items-center justify-between px-8 lg:px-16 py-6'>
-          <div className='text-yellow text-sm lg:text-base font-medium tracking-wider drop-shadow-lg'>
-            <span className='font-patrick-hand'>Neige.app</span>
-          </div>
+      <Navbar />
 
-          <div className='hidden md:flex items-center gap-8 lg:gap-12'>
-            <a
-              href='/'
-              className='text-yellow hover:text-yellow/80 transition-colors text-sm drop-shadow-md'
-            >
-              {t("nav.home")}
-            </a>
-            <a
-              href='/app'
-              className='text-yellow hover:text-yellow/80 transition-colors text-sm drop-shadow-md'
-            >
-              {t("nav.liveMap")}
-            </a>
-            <a
-              href='/contact'
-              className='text-yellow hover:text-yellow/80 transition-colors text-sm drop-shadow-md'
-            >
-              {t("nav.contact")}
-            </a>
-          </div>
-        </nav>
-
+      <div className='relative z-10 flex flex-col h-full justify-center pt-20 lg:pt-0'>
         <div className='flex-1 flex flex-col justify-center items-center px-8 lg:px-16 py-12 max-w-5xl mx-auto text-center'>
           <div className='mb-6'>
             <div className='text-yellow text-xs lg:text-sm font-medium tracking-widest drop-shadow-lg'>
@@ -64,7 +40,7 @@ export function Hero() {
               ))}
           </h1>
 
-          <p className='text-yellow text-lg lg:text-xl max-w-2xl drop-shadow-lg leading-relaxed mb-12'>
+          <p className='hidden sm:block text-yellow text-lg lg:text-xl max-w-2xl drop-shadow-lg leading-relaxed mb-12'>
             {t("hero.description")}
           </p>
 

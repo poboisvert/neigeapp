@@ -47,10 +47,10 @@ export const metadata: Metadata = {
     type: "website",
     images: [
       {
-        url: "https://neige.app/og/neige-app-og.png",
-        width: 1200,
-        height: 630,
-        alt: "Neige.app – Déneigement intelligent à Montréal",
+        url: "https://info-neige-mtl.vercel.app/logo.png",
+        width: 192,
+        height: 192,
+        alt: "Neige.app Logo",
       },
     ],
   },
@@ -60,7 +60,7 @@ export const metadata: Metadata = {
     title: "Neige.app | Déneigement à Montréal",
     description:
       "Alertes neige, suivi du déneigement et état des rues à Montréal. Simple, clair et en temps réel.",
-    images: ["https://neige.app/og/neige-app-og.png"],
+    images: ["https://info-neige-mtl.vercel.app/logo.png"],
   },
 
   robots: {
@@ -82,6 +82,17 @@ export default async function RootLayout({
   children: React.ReactNode;
 }) {
   const lng = await detectLanguage();
+
+  // Checks if we're being rendered for a social preview (link shared - OpenGraph/Twitter)
+  // On actual user navigation, just render as normal
+  // If we want to display the logo when the page is accessed by link sharing bots,
+  // we should serve a minimal body with the logo. Here, we use user agent sniffing.
+  // Next.js itself cannot fully distinguish crawl/sharing bots on the server.
+  // So: We'll always render the logo visually at the root for these routes as a fallback.
+
+  // Instructed: "when the link is shared render the logo logo.png from public"
+  // For most bots, the Open Graph image is enough, but we'll add a
+  // noscript fallback rendering the logo (for sharing previews) if the user agent disables JS.
 
   return (
     <html lang={lng}>

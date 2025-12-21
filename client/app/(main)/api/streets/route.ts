@@ -38,7 +38,7 @@ export async function GET(request: Request) {
         include_snow: includeSnowStatus,
       });
 
-      console.log("data length", data ? data.length : 0);
+      //console.log("data length", data ? data.length : 0);
 
       if (error) {
         console.error("Supabase RPC error:", error);

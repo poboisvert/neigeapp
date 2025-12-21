@@ -49,7 +49,7 @@ export const metadata: Metadata = {
     type: "website",
     images: [
       {
-        url: "https://neige.app/og/neige-app-og.png",
+        url: "https://info-neige-mtl.vercel.app/logo.png",
         width: 1200,
         height: 630,
         alt: "Neige.app – Déneigement intelligent à Montréal",
@@ -62,7 +62,7 @@ export const metadata: Metadata = {
     title: "Neige.app | Déneigement à Montréal",
     description:
       "Alertes neige, suivi du déneigement et état des rues à Montréal. Simple, clair et en temps réel.",
-    images: ["https://neige.app/og/neige-app-og.png"],
+    images: ["https://info-neige-mtl.vercel.app/logo.png"],
   },
 
   robots: {
